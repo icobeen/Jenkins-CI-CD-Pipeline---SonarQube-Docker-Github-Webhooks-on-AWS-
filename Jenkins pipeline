@@ -1,0 +1,54 @@
+pipeline {
+    agent any
+
+    environment {
+        GITHUB_CREDENTIALS = credentials('github-credentials')  // GitHub credentials ID
+        DOCKER_CREDENTIALS = credentials('dockerhub-creds')      // Docker Hub credentials ID
+        DOCKER_IMAGE = 'icobeen/my-website'                      // Docker Hub image name (icobeen is your Docker Hub username)
+    }
+
+    stages {
+        stage('Clone Repository') {
+            steps {
+                // Clone the repository from GitHub
+                git credentialsId: 'github-credentials', url: 'https://github.com/icobeen/Jenkins-SonarQube-Docker.git'
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                // Build the Docker image using the Dockerfile in your repo
+                script {
+                    docker.build("$DOCKER_IMAGE")
+                }
+            }
+        }
+
+        stage('Push Docker Image to Docker Hub') {
+            steps {
+                // Push the Docker image to Docker Hub
+                script {
+                    docker.withRegistry('https://registry.hub.docker.com', 'dockerhub-creds') {
+                        docker.image("$DOCKER_IMAGE").push("latest")
+                    }
+                }
+            }
+        }
+
+        stage('Deploy Docker Container') {
+            steps {
+                // Deploy the Docker container (you can customize the port mapping if needed)
+                script {
+                    sh 'docker run -d -p 80:80 $DOCKER_IMAGE'
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            // Cleanup Docker containers and images to save space
+            sh 'docker system prune -f'
+        }
+    }
+}
